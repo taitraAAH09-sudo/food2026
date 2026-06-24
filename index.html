@@ -334,7 +334,11 @@ setInterval(loadAllData, 15000); // 每15秒自動重新整理
 
 function rebuildGuests(){
   guests.length=0;
-  guests.push(...[...new Set(Object.values(seatMap))].sort());
+  // 合併 seatMap 和 asgn 兩個來源，統一清理空白
+  const allNames = new Set();
+  Object.values(seatMap).forEach(n=>{ if(n){ const c=n.replace(/\s+/g,' ').trim(); if(c) allNames.add(c); }});
+  Object.values(asgn).forEach(n=>{ if(n){ const c=n.replace(/\s+/g,' ').trim(); if(c) allNames.add(c); }});
+  guests.push(...[...allNames].sort());
 }
 
 // ── 儲存到 Firebase ──
@@ -704,7 +708,7 @@ function updateStats(){
 }
 
 window.renderChips=function renderChips(){
-  const aset=new Set(Object.values(asgn));
+  const aset=new Set(Object.values(asgn).map(n=>n?n.replace(/\s+/g,' ').trim():''));
   const kw=(document.getElementById('gs')||{value:''}).value.trim().toLowerCase();
   document.querySelectorAll('.seat.found').forEach(el=>el.classList.remove('found'));
   const box=document.getElementById('chips');box.innerHTML='';
