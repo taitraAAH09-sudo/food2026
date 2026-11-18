@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>飲料算錢台 V7</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{--bg:#f7f3ee;--card:#fff;--ink:#3d3530;--sub:#a0958c;--line:#f0e9e1;--brand:#b0825f;--brand-d:#8f6545;--soft:#f6eee6;--field:#fbf9f6;--ok:#5a9e7c;--okbg:#e9f5ee;--warn:#cc6f5e;--warnbg:#fcefeb}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6}
+header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:12px 22px;gap:12px;flex-wrap:wrap}
+header h1{margin:0;font-size:19px;color:var(--brand-d);letter-spacing:1px;font-weight:700}
+.ver{font-size:11px;background:var(--soft);color:var(--brand);padding:2px 9px;border-radius:10px;margin-left:8px;vertical-align:2px;font-weight:600}
+.hright{display:flex;align-items:center;gap:12px}
+.conn{font-size:12px;color:var(--sub)}
+.conn.on{color:var(--ok)}
+nav{background:var(--soft);border-radius:20px;padding:3px;display:flex}
+nav button{background:transparent;border:0;color:var(--brand);padding:6px 20px;border-radius:17px;cursor:pointer;font:inherit;font-size:14px}
+nav button.active{background:#fff;color:var(--brand-d);font-weight:700;box-shadow:0 1px 4px rgba(120,90,60,.12)}
+main{max-width:1080px;margin:0 auto;padding:22px 16px 60px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+input,select{font:inherit;font-size:14px;padding:8px 11px;border:1px solid #ece4da;border-radius:10px;background:var(--field);color:var(--ink)}
+input:focus,select:focus{outline:none;border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(176,130,95,.15)}
+.btn{font:inherit;font-size:14px;padding:8px 16px;border-radius:10px;border:0;background:var(--brand);color:#fff;cursor:pointer;transition:.15s}
+.btn:hover{background:var(--brand-d)}
+.btn.ghost{background:var(--soft);color:var(--brand-d)}
+.btn.ghost:hover{background:#efe2d5}
+.btn.danger{background:transparent;color:var(--warn)}
+.btn.danger:hover{background:var(--warnbg)}
+.btn.sm{padding:3px 10px;font-size:12px}
+.card{background:var(--card);border-radius:18px;padding:20px 22px;margin-bottom:18px;box-shadow:0 2px 14px rgba(120,90,60,.06)}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.d{font-size:18px;font-weight:700}
+.meta{color:var(--sub);font-size:13px}
+table.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:12px;color:var(--sub);font-weight:500;text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:8px 10px;vertical-align:middle}
+.tbl tbody tr+tr td{border-top:1px dashed #f3ede6}
+.tbl tbody.grp+tbody.grp tr:first-child td{border-top:1px solid var(--line)}
+.tbl .r{text-align:right;white-space:nowrap}
+.tblwrap{overflow-x:auto}
+.due b{font-size:16px}
+.due small{display:block;color:var(--sub);font-size:11px;line-height:1.3}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:7px;margin-right:5px;vertical-align:1px;white-space:nowrap;font-weight:600}
+.pname{color:var(--ink);font-weight:600;cursor:pointer;border-bottom:1px dashed var(--brand)}
+.pname:hover{color:var(--brand)}
+.note{color:var(--sub);font-size:13px}
+.feeline{background:var(--soft);color:#7a5a40;border-radius:12px;padding:10px 14px;margin:14px 0 0;font-size:13px}
+.feeline b{color:var(--brand-d)}
+.seg{display:inline-flex;background:var(--soft);border-radius:16px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--brand);padding:4px 12px;cursor:pointer;font:inherit;font-size:12px;border-radius:13px}
+.seg button.on{background:#fff;color:var(--brand-d);font-weight:700;box-shadow:0 1px 3px rgba(120,90,60,.12)}
+.chip{display:inline-block;font-size:11px;padding:0 8px;border-radius:9px;margin-top:2px}
+.chip.ok{background:var(--okbg);color:var(--ok)}
+.chip.no{background:var(--warnbg);color:var(--warn)}
+.chip.over{background:#e9eef9;color:#4a64a0}
+.stats{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.stats div{flex:1;min-width:100px;text-align:center;padding:8px;border-radius:12px;background:var(--field)}
+.stats small{display:block;color:var(--sub);font-size:12px}
+.stats b{font-size:17px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;align-items:end}
+.grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.empty{text-align:center;color:var(--sub);padding:50px 10px}
+.hint{font-size:12px;color:var(--sub)}
+details.sec{background:var(--card);border-radius:18px;margin-bottom:16px;box-shadow:0 2px 14px rgba(120,90,60,.06)}
+details.sec>summary{list-style:none;cursor:pointer;padding:16px 22px;font-size:16px;font-weight:700;color:var(--brand-d);display:flex;justify-content:space-between}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::after{content:'＋';color:var(--sub);font-weight:400}
+details.sec[open]>summary::after{content:'－'}
+details.sec>.in{padding:16px 22px 20px}
+details.sec>summary{border-radius:18px;transition:.15s}
+details.sec[open]>summary{border-radius:18px 18px 0 0}
+details.sec:nth-of-type(odd)>summary{background:#f3e6d8;color:#7a4f2e}
+details.sec:nth-of-type(even)>summary{background:#e3efe9;color:#2f6b54}
+h3{font-size:14px;color:var(--brand-d);margin:18px 0 6px}
+.tags-edit{margin:8px 0 12px}
+.tags-edit .tag{font-size:13px;padding:3px 6px 3px 10px;margin:3px}
+.tags-edit .tag button{border:0;background:transparent;cursor:pointer;color:inherit;opacity:.6;padding:0 3px}
+tr.sel td{background:#fff8f0}
+.preview{background:var(--soft);color:#7a5a40;border-radius:10px;padding:8px 12px;font-size:13px;margin-top:10px}
+.modal{position:fixed;inset:0;background:rgba(60,45,30,.35);backdrop-filter:blur(2px);display:flex;align-items:flex-start;justify-content:center;padding:40px 12px;z-index:50;overflow:auto}
+.modal[hidden]{display:none}
+.modal .box{background:#fff;border-radius:20px;max-width:820px;width:100%;padding:22px;position:relative}
+.modal .x{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:22px;cursor:pointer;color:var(--sub)}
+.lock{max-width:340px;margin:70px auto;text-align:center}
+.modetag{font-size:12px;color:var(--brand-d);background:var(--soft);padding:4px 12px;border-radius:12px;white-space:nowrap}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.foot .feetxt{font-size:13px;color:#8a6e57}
+.foot .feetxt b{color:var(--brand-d)}
+.foot .sums{font-size:13px;color:var(--sub);white-space:nowrap}
+.foot .sums b{font-size:15px;color:var(--ink);margin:0 10px 0 4px}
+.itn{display:block;font-size:12px;color:var(--sub);line-height:1.3}
+.fee{color:var(--sub);font-size:13px}
+.mybox{background:#fff;border-radius:16px;padding:14px 18px;margin-bottom:12px;box-shadow:0 2px 14px rgba(120,90,60,.06);border-left:4px solid var(--brand);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.mybox .big{font-size:22px;font-weight:700}
+.mybox .sub{font-size:13px;color:var(--sub)}
+.ie{border:1px solid transparent;background:transparent;padding:4px 6px;border-radius:7px;width:100%;min-width:60px}
+.ie:hover{border-color:#ece4da;background:var(--field)}
+.ie.n{width:72px;text-align:right}
+select.ie{min-width:90px}
+.wal{color:#4a64a0;font-weight:600}
+@media(max-width:640px){main{padding:14px 10px}.card{padding:16px 14px}.tbl td,.tbl th{padding:6px 6px;font-size:13px}header{padding:10px 14px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧋 飲料算錢台<span class="ver">V7</span></h1>
+  <div class="hright"><span class="conn" id="conn">💾 本機模式</span>
+  <nav><button data-tab="front" class="active">前台</button><button data-tab="back">後台</button></nav></div>
+</header>
+
+<main>
+<section id="front">
+  <div class="toolbar">
+    <select id="fOrder"></select>
+    <input id="fSearch" placeholder="🔍 搜尋姓名、小標、品項" style="flex:1;min-width:180px">
+  </div>
+  <div id="frontList"></div>
+</section>
+
+<section id="back" hidden>
+  <div id="lockBox" class="lock card">
+    <div class="d" style="margin-bottom:12px">後台登入</div>
+    <input id="pinIn" type="password" placeholder="請輸入後台密碼" style="width:100%;margin-bottom:10px">
+    <button class="btn" id="pinBtn" style="width:100%">進入</button>
+  </div>
+
+  <div id="backBody" hidden>
+    <details class="sec" open><summary>① 訂單</summary><div class="in">
+      <div class="grid">
+        <label>日期<input type="date" id="oDate"></label>
+        <label>店家<input id="oShop" placeholder="例：五十嵐"></label>
+        <label>訂購平台<input id="oPlatform" list="platformList" placeholder="可選或自行輸入"></label>
+        <datalist id="platformList"><option>Uber Eats</option><option>foodpanda</option><option>店家 App／LINE</option><option>電話訂購</option><option>現場自取</option></datalist>
+        <label>分攤方式<select id="oMode"><option value="person">訂購人平均</option><option value="cup">杯數平均</option></select></label>
+        <label>運費（＋）<input type="number" id="oShip" min="0" value="0"></label>
+        <label>服務費（＋）<input type="number" id="oService" min="0" value="0"></label>
+        <label>其他費用（＋）<input type="number" id="oOther" min="0" value="0"></label>
+        <label>折扣（－）<input type="number" id="oDiscount" min="0" value="0"></label>
+      </div>
+      <div class="preview" id="oPreview"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="oSave">新增訂單</button>
+        <button class="btn ghost" id="oCancel" hidden>取消編輯</button>
+      </div>
+      <div class="tblwrap" style="margin-top:12px"><table class="tbl" id="oTable"></table></div>
+    </div></details>
+
+    <details class="sec" open><summary>② 登記品項</summary><div class="in">
+      <div class="grid">
+        <label>訂單<select id="iOrder"></select></label>
+        <label>訂購人<input id="iName" list="peopleList" placeholder="新名字會自動建檔"></label>
+        <label>小標<select id="iTag"></select></label>
+        <label>品項<input id="iItem" placeholder="例：珍奶 半糖少冰"></label>
+        <label>杯數<input type="number" id="iQty" value="1" min="1"></label>
+        <label>單價<input type="number" id="iPrice" placeholder="0"></label>
+        <label style="grid-column:span 2">備註<input id="iNote" placeholder="例：加珍珠、大杯"></label>
+      </div>
+      <datalist id="peopleList"></datalist>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="iAdd">加入品項</button>
+        <span class="hint">按 Enter 也能加入。下方清單的訂購人、品項、杯數、單價、備註都可以直接改</span>
+      </div>
+      <div class="tblwrap" style="margin-top:12px"><table class="tbl" id="iTable"></table></div>
+    </div></details>
+
+    <details class="sec" open><summary>③ 付款紀錄</summary><div class="in">
+      <h3 style="margin-top:0">依人員收款</h3>
+      <div class="grid">
+        <label>姓名<select id="cPerson"></select></label>
+        <label>付款日期<input type="date" id="cDate"></label>
+        <label>付款方式<select id="cMethod"></select></label>
+      </div>
+      <div id="cInfo" style="margin-top:10px"></div>
+      <h3>單筆付款</h3>
+      <div class="grid">
+        <label>日期（訂單）<select id="pOrder"></select></label>
+        <label>姓名<select id="pPerson"></select></label>
+        <label>付款日期<input type="date" id="pDate"></label>
+        <label>付款方式<select id="pMethod"></select></label>
+        <label>付款金額<input type="number" id="pAmount"></label>
+        <button class="btn" id="pAdd">新增付款</button>
+      </div>
+      <div class="preview" id="pInfo">請先選訂單與姓名</div>
+      <h3>未付清名單</h3>
+      <div class="row" style="margin-bottom:6px"><span class="hint">一鍵付清用：</span><select id="quickMethod"></select></div>
+      <div class="tblwrap"><table class="tbl" id="owTable"></table></div>
+      <h3>全部付款紀錄 <span class="hint">（付款日期、方式、金額可以直接改）</span></h3>
+      <div class="tblwrap"><table class="tbl" id="pTable"></table></div>
+    </div></details>
+
+    <details class="sec" open><summary>④ 零用金</summary><div class="in">
+      <div class="grid">
+        <label>姓名<input id="wName" list="peopleList" placeholder="誰儲值"></label>
+        <label>儲值日期<input type="date" id="wDate"></label>
+        <label>儲值金額（退款打負數）<input type="number" id="wAmount" placeholder="1000"></label>
+        <label>方式<select id="wMethod"></select></label>
+        <label>備註<input id="wNote" placeholder="選填"></label>
+        <button class="btn" id="wAdd">儲值</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost" id="wAuto">一鍵扣款（所有有零用金的人）</button>
+        <span class="hint">從最舊的未付訂單開始扣，扣到零用金用完為止，付款方式記為「零用金」</span>
+      </div>
+      <h3>零用金餘額</h3>
+      <div class="tblwrap"><table class="tbl" id="wBal"></table></div>
+      <h3>儲值紀錄 <span class="hint">（可以直接改）</span></h3>
+      <div class="tblwrap"><table class="tbl" id="wTable"></table></div>
+    </div></details>
+
+    <details class="sec"><summary>⑤ 人員與小標</summary><div class="in">
+      <div class="row">
+        <input id="tagIn" placeholder="新增小標，例：展三組">
+        <button class="btn ghost" id="tagAdd">新增小標</button>
+      </div>
+      <div class="tags-edit" id="tagList"></div>
+      <div class="tblwrap"><table class="tbl" id="peTable"></table></div>
+    </div></details>
+
+    <details class="sec" open><summary>⑥ 匯出</summary><div class="in">
+      <button class="btn" id="dXlsx">匯出 Excel</button>
+      <span class="hint" style="margin-left:8px">含帳務總表、品項明細、付款紀錄、零用金、人員總覽五個工作表</span>
+    </div></details>
+  </div>
+</section>
+</main>
+
+<div id="modal" class="modal" hidden><div class="box"><button class="x" id="mClose">×</button><div id="mBody"></div></div></div>
+
+<script>
+/* ===== Firebase 設定：貼上專案的 firebaseConfig（要有 databaseURL）；留空＝本機模式 ===== */
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyDuRoXvvvQms5fbYed-9qsnAMO8mcd8RKU",
+  authDomain:"newtest-b562b.firebaseapp.com",
+  databaseURL:"https://newtest-b562b-default-rtdb.firebaseio.com",
+  projectId:"newtest-b562b",
+  storageBucket:"newtest-b562b.firebasestorage.app",
+  messagingSenderId:"406317877228",
+  appId:"1:406317877228:web:322f741d0dc09cf88d62c9"
+};
+const ROOT='drinkSplit';            // 資料放在資料庫的這個節點底下，不會動到同專案的其他資料
+const DEFAULT_PIN='123456789';
+const KEY='drinkSplit_v1';
+const CASH_METHODS=['現金','轉帳','LINE Pay','街口支付','其他'];
+const WALLET='零用金';
+const METHODS=[...CASH_METHODS,WALLET];
+const TAG_COLORS=[['#f6e3d3','#9a5b2e'],['#dff0e8','#3d7a5c'],['#e3e8f8','#4a5aa0'],['#f7e1ea','#a04a6c'],['#f6efd3','#8a6d1e'],['#e8e1f5','#6a4f9c'],['#ddeef4','#2f6f8a']];
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Math.round(+n||0).toLocaleString('zh-TW');
+const money=n=>(n<0?'-$':'$')+fmt(Math.abs(n));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+const WD='日一二三四五六';
+const fdate=s=>{if(!s)return'';const d=new Date(s+'T00:00');return s.replace(/-/g,'/')+' ('+WD[d.getDay()]+')'};
+const sdate=s=>{if(!s)return'';const d=new Date(s+'T00:00');return s.slice(5).replace('-','/')+' ('+WD[d.getDay()]+')'};
+const clean=v=>JSON.parse(JSON.stringify(v));
+
+/* ===== 資料層 ===== */
+function blank(){return{people:[],orders:[],payments:[],deposits:[],tags:['活動組','展三組'],settings:{pin:DEFAULT_PIN}}}
+function migrate(s){
+  s.deposits=s.deposits||[];
+  s.orders.forEach(o=>{
+    o.items=o.items||[];
+    if(o.discount==null){o.discount=0;if((+o.other||0)<0){o.discount=-o.other;o.other=0}}
+  });
+  if(!s.settings||!s.settings.pin||s.settings.pin==='0000')s.settings={pin:DEFAULT_PIN};
+  return s;
+}
+function fromDb(v){
+  v=v||{};
+  return migrate({
+    people:Object.values(v.people||{}),
+    orders:Object.values(v.orders||{}).map(o=>({...o,items:o.items?Object.values(o.items):[]})),
+    payments:Object.values(v.payments||{}),
+    deposits:Object.values(v.deposits||{}),
+    tags:v.tags?Object.values(v.tags):(v.meta?[]:['活動組','展三組']),
+    settings:{pin:(v.settings&&v.settings.pin)||DEFAULT_PIN}
+  });
+}
+const keyBy=a=>Object.fromEntries(a.map(x=>[x.id,x]));
+const toDb=s=>({meta:{init:true},people:keyBy(s.people),orders:keyBy(s.orders),payments:keyBy(s.payments),deposits:keyBy(s.deposits),tags:s.tags,settings:s.settings});
+
+const USE_FB=!!(FIREBASE_CONFIG.databaseURL&&window.firebase);
+let db=null,ready=!USE_FB;
+let S=blank();
+if(USE_FB){
+  firebase.initializeApp(FIREBASE_CONFIG);db=firebase.database();
+  $('#conn').textContent='☁ 連線中…';
+  db.ref(ROOT).on('value',snap=>{S=fromDb(snap.val());ready=true;renderAll()},err=>{$('#conn').textContent='⚠ 雲端讀取失敗';alert('Firebase 讀取失敗：'+err.message)});
+  db.ref('.info/connected').on('value',s=>{const c=$('#conn');c.textContent=s.val()?'☁ 雲端同步中':'☁ 離線（恢復後自動同步）';c.classList.toggle('on',!!s.val())});
+}else{
+  try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.orders)S=migrate(Object.assign(blank(),d))}catch(e){}
+}
+/* ops: [[路徑, 值或 null]] */
+function commit(ops){
+  if(USE_FB){const u={'meta/init':true};ops.forEach(([p,v])=>u[p]=v==null?null:clean(v));db.ref(ROOT).update(u).catch(e=>alert('雲端寫入失敗：'+e.message))}
+  else localStorage.setItem(KEY,JSON.stringify(S));
+  renderAll();
+}
+function commitAll(){
+  if(USE_FB)db.ref(ROOT).set(clean(toDb(S))).catch(e=>alert('雲端寫入失敗：'+e.message));
+  else localStorage.setItem(KEY,JSON.stringify(S));
+  renderAll();
+}
+
+const P=id=>S.people.find(p=>p.id===id)||{name:'(已刪除)',tag:''};
+const O=id=>S.orders.find(o=>o.id===id);
+function tagHtml(t){if(!t)return'';let h=0;for(const c of t)h=(h*31+c.charCodeAt(0))>>>0;const[bg,fg]=TAG_COLORS[h%TAG_COLORS.length];return `<span class="tag" style="background:${bg};color:${fg}">${esc(t)}</span>`}
+function pLink(pid){const p=P(pid);return `${tagHtml(p.tag)}<span class="pname" data-pid="${pid}">${esc(p.name)}</span>`}
+function byPerson(a,b){const pa=P(a.pid),pb=P(b.pid);return (pa.tag||'~').localeCompare(pb.tag||'~','zh-Hant')||pa.name.localeCompare(pb.name,'zh-Hant')}
+
+/* ===== 計算：(運費+服務費+其他) − 折扣，除以人數或杯數，除不盡無條件進位 ===== */
+function feeOf(o){const add=(+o.ship||0)+(+o.service||0)+(+o.other||0),disc=+o.discount||0;return{add,disc,net:add-disc}}
+const ceilDiv=(a,b)=>b?Math.ceil(a/b-1e-9):0;
+function calcOrder(o){
+  const map=new Map();
+  o.items.forEach(it=>{
+    if(!map.has(it.pid))map.set(it.pid,{pid:it.pid,items:[],sub:0,cups:0});
+    const r=map.get(it.pid),amt=(+it.qty||0)*(+it.price||0);
+    r.items.push({...it,amt});r.sub+=amt;r.cups+=(+it.qty||0);
+  });
+  const rows=[...map.values()].sort(byPerson);
+  const f=feeOf(o),cups=rows.reduce((a,r)=>a+r.cups,0);
+  const isCup=o.mode==='cup',unit=ceilDiv(f.net,isCup?cups:rows.length);
+  rows.forEach(r=>{
+    r.share=isCup?unit*r.cups:unit;r.due=r.sub+r.share;
+    r.paid=S.payments.filter(p=>p.oid===o.id&&p.pid===r.pid).reduce((a,p)=>a+(+p.amount||0),0);
+    r.remain=r.due-r.paid;
+  });
+  const sum=k=>rows.reduce((a,r)=>a+r[k],0);
+  return{rows,...f,unit,isCup,cups,itemsTotal:sum('sub'),shareTotal:sum('share'),grand:sum('due'),paid:sum('paid'),remain:sum('remain')};
+}
+function chip(remain){return remain===0?'<span class="chip ok">已付清</span>':remain>0?'<span class="chip no">待付</span>':'<span class="chip over">溢付 '+money(-remain)+'</span>'}
+const sortedOrders=()=>[...S.orders].sort((a,b)=>b.date.localeCompare(a.date));
+const orderLabel=o=>fdate(o.date)+(o.shop?'　'+o.shop:'')+(o.platform?'（'+o.platform+'）':'');
+
+/* ===== 零用金 ===== */
+function wallet(pid){
+  const dep=S.deposits.filter(d=>d.pid===pid).reduce((a,d)=>a+(+d.amount||0),0);
+  const used=S.payments.filter(p=>p.pid===pid&&p.method===WALLET).reduce((a,p)=>a+(+p.amount||0),0);
+  return{dep,used,bal:dep-used};
+}
+function personSum(pid){
+  let owe=0,cnt=0,due=0;const list=[];
+  [...S.orders].sort((a,b)=>a.date.localeCompare(b.date)).forEach(o=>{const r=calcOrder(o).rows.find(x=>x.pid===pid);if(!r)return;due+=r.due;if(r.remain>0){owe+=r.remain;cnt++;list.push({o,r})}});
+  return{owe,cnt,due,list,...wallet(pid)};
+}
+/* 用零用金扣款：從最舊的未付訂單開始，回傳要寫入的 ops */
+function walletDeduct(pid){
+  const s=personSum(pid);let bal=s.bal;const ops=[];
+  for(const {o,r} of s.list){
+    if(bal<=0)break;
+    const amt=Math.min(bal,r.remain);
+    const p={id:uid(),oid:o.id,pid,payDate:today(),method:WALLET,amount:amt,ts:Date.now()+ops.length};
+    S.payments.push(p);ops.push(['payments/'+p.id,p]);bal-=amt;
+  }
+  return ops;
+}
+function feeText(o,c){
+  const parts=[];
+  if(+o.ship)parts.push(`運費 ${money(o.ship)}`);
+  if(+o.service)parts.push(`服務費 ${money(o.service)}`);
+  if(+o.other)parts.push(`其他 ${money(o.other)}`);
+  let s=parts.join(' ＋ ')||'無加收費用';
+  if(c.disc)s+=` － 折扣 ${money(c.disc)}`;
+  if(!c.add&&!c.disc)return'沒有運費、服務費或折扣';
+  const base=c.isCup?`${c.cups} 杯`:`${c.rows.length} 人`;
+  s+=` ＝ <b>${money(c.net)}</b> ÷ ${base} ＝ 每${c.isCup?'杯':'人'} <b>${money(c.unit)}</b>`;
+  const diff=c.shareTotal-c.net;
+  if(diff)s+=`（除不盡進位，多收 ${money(diff)}）`;
+  return s;
+}
+
+/* ===== 前台 ===== */
+function myBoxes(q){
+  if(!q)return'';
+  const ps=S.people.filter(p=>p.name.toLowerCase().includes(q)).slice(0,6);
+  return ps.map(p=>{
+    const s=personSum(p.id);
+    const status=s.owe>0?`目前共欠 <span class="big" style="color:var(--warn)">${money(s.owe)}</span> <span class="sub">（${s.cnt} 筆未付）</span>`:`<span class="big" style="color:var(--ok)">都付清了 🎉</span>`;
+    let w='';
+    if(s.dep||s.used){w=`零用金餘額 <span class="wal">${money(s.bal)}</span>`;if(s.owe>0)w+=s.bal>=s.owe?'，夠扣，等團主扣款即可':s.bal>0?`，扣完還差 ${money(s.owe-s.bal)}`:'，已用完'}
+    return `<div class="mybox"><div><div style="margin-bottom:2px">${tagHtml(p.tag)}<b>${esc(p.name)}</b></div><div>${status}</div>${w?`<div class="sub">${w}</div>`:''}</div><button class="btn ghost" data-pid="${p.id}">看全部紀錄</button></div>`;
+  }).join('');
+}
+function renderFront(){
+  if(!ready){$('#frontList').innerHTML='<div class="card empty">連線雲端中…</div>';return}
+  const fo=$('#fOrder'),cur=fo.value;
+  fo.innerHTML='<option value="">全部日期</option>'+sortedOrders().map(o=>`<option value="${o.id}">${esc(orderLabel(o))}</option>`).join('');
+  fo.value=O(cur)?cur:'';
+  const q=$('#fSearch').value.trim().toLowerCase();
+  let orders=sortedOrders();if(fo.value)orders=orders.filter(o=>o.id===fo.value);
+  const html=orders.map(o=>orderCard(o,q)).filter(Boolean).join('');
+  $('#frontList').innerHTML=myBoxes(q)+(html||`<div class="card empty">${S.orders.length?'找不到符合的資料':'還沒有訂單 ☕<br><span class="hint">請到後台新增訂單</span>'}</div>`);
+}
+function orderCard(o,q){
+  const c=calcOrder(o);
+  const hit=r=>!q||(P(r.pid).name+' '+P(r.pid).tag+' '+r.items.map(i=>i.item+' '+i.note).join(' ')).toLowerCase().includes(q);
+  const rows=c.rows.filter(hit);
+  if(q&&!rows.length)return'';
+  const body=rows.map(r=>{
+    const n=r.items.length,rs=n>1?` rowspan="${n}"`:'';
+    return '<tbody class="grp">'+r.items.map((it,i)=>`<tr>${i?'':`<td${rs}>${pLink(r.pid)}</td>`}<td>${esc(it.item)}${it.note?`<span class="itn">${esc(it.note)}</span>`:''}</td><td class="r">${it.qty}</td><td class="r">${money(it.amt)}</td>${i?'':`<td${rs} class="r fee">${r.share>0?'+':''}${money(r.share)}</td><td${rs} class="r"><b>${money(r.due)}</b></td><td${rs} class="r">${chip(r.remain)}</td>`}</tr>`).join('')+'</tbody>';
+  }).join('');
+  return `<article class="card">
+    <div class="card-h"><div><div class="d">${fdate(o.date)}</div><div class="meta">${esc(o.shop||'未填店家')}${o.platform?'・'+esc(o.platform):''}・${c.rows.length} 人・${c.cups} 杯</div></div>
+      <span class="modetag">費用依${c.isCup?'杯數':'訂購人'}平均</span></div>
+    <div class="tblwrap"><table class="tbl"><thead><tr><th>訂購人</th><th>品項／備註</th><th class="r">杯數</th><th class="r">金額</th><th class="r">費用</th><th class="r">應付</th><th class="r">狀態</th></tr></thead>
+      ${body||'<tbody><tr><td colspan="7" class="note">尚無品項</td></tr></tbody>'}</table></div>
+    <div class="foot"><div class="feetxt">${feeText(o,c)}</div>
+      <div class="sums">總金額<b>${money(c.grand)}</b>已收<b style="color:var(--ok)">${money(c.paid)}</b>未收<b style="color:${c.remain>0?'var(--warn)':'var(--ok)'};margin-right:0">${money(c.remain)}</b></div></div>
+  </article>`;
+}
+
+/* ===== 個人紀錄 ===== */
+function openPerson(pid,year){
+  const p=P(pid);
+  const all=sortedOrders().filter(o=>o.items.some(it=>it.pid===pid));
+  const years=[...new Set(all.map(o=>o.date.slice(0,4)))];
+  const list=year?all.filter(o=>o.date.startsWith(year)):all;
+  let tSub=0,tShare=0,tDue=0,tPaid=0,tCups=0,body='';
+  list.forEach(o=>{
+    const r=calcOrder(o).rows.find(x=>x.pid===pid),n=r.items.length;
+    body+='<tbody class="grp">'+r.items.map((it,i)=>`<tr>${i?'':`<td rowspan="${n}">${sdate(o.date)}<div class="note">${esc(o.shop)}</div></td>`}<td>${esc(it.item)}</td><td class="r">${it.qty}</td><td class="r">${money(it.amt)}</td><td class="note">${esc(it.note)}</td>${i?'':`<td rowspan="${n}" class="r due"><b>${money(r.due)}</b><small>費用 ${money(r.share)}</small>${chip(r.remain)}</td>`}</tr>`).join('')+'</tbody>';
+    tSub+=r.sub;tShare+=r.share;tDue+=r.due;tPaid+=r.paid;tCups+=r.cups;
+  });
+  const w=wallet(pid),ow=personSum(pid).owe;
+  $('#mBody').innerHTML=`<div class="d" style="margin-bottom:4px">${tagHtml(p.tag)}${esc(p.name)} 的訂購紀錄</div>
+    <div style="margin-bottom:10px">目前共欠 <b style="color:${ow>0?'var(--warn)':'var(--ok)'};font-size:18px">${money(ow)}</b>${w.dep||w.used?`　零用金餘額 <span class="wal">${money(w.bal)}</span>（儲值 ${money(w.dep)}，已扣 ${money(w.used)}）`:''}</div>
+    <div class="row" style="margin-bottom:6px"><select id="mYear"><option value="">全部年度</option>${years.map(y=>`<option ${y===year?'selected':''}>${y}</option>`).join('')}</select><span class="hint">共 ${list.length} 次・${tCups} 杯</span></div>
+    <div class="stats" style="margin-bottom:14px"><div><small>飲料</small><b>${money(tSub)}</b></div><div><small>分攤費用</small><b>${money(tShare)}</b></div><div><small>總額</small><b>${money(tDue)}</b></div><div><small>已付</small><b style="color:var(--ok)">${money(tPaid)}</b></div><div><small>未付</small><b style="color:${tDue-tPaid>0?'var(--warn)':'var(--ok)'}">${money(tDue-tPaid)}</b></div></div>
+    <div class="tblwrap"><table class="tbl"><thead><tr><th>日期</th><th>品項</th><th class="r">杯數</th><th class="r">金額</th><th>備註</th><th class="r">應付</th></tr></thead>${body||'<tbody><tr><td colspan="6" class="note">沒有紀錄</td></tr></tbody>'}</table></div>`;
+  $('#mYear').onchange=e=>openPerson(pid,e.target.value);
+  $('#modal').hidden=false;
+}
+$('#mClose').onclick=()=>$('#modal').hidden=true;
+$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').hidden=true};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#modal').hidden=true});
+
+/* ===== 後台 ===== */
+let editOid=null,pendingOid=null;
+function peopleOpts(sel){return [...S.people].sort((a,b)=>byPerson({pid:a.id},{pid:b.id})).map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${esc((p.tag?'('+p.tag+') ':'')+p.name)}</option>`).join('')}
+function fillSelect(el,opts,prefer){const v=prefer||el.value;el.innerHTML=opts;if([...el.options].some(o=>o.value===v))el.value=v}
+function renderBack(){
+  if($('#backBody').hidden)return;
+  const orderOpts=sortedOrders().map(o=>`<option value="${o.id}">${esc(orderLabel(o))}</option>`).join('')||'<option value="">請先新增訂單</option>';
+  fillSelect($('#iOrder'),orderOpts,pendingOid);fillSelect($('#pOrder'),orderOpts,pendingOid);pendingOid=null;
+  fillSelect($('#iTag'),'<option value="">（無）</option>'+S.tags.map(t=>`<option>${esc(t)}</option>`).join(''));
+  $('#peopleList').innerHTML=S.people.map(p=>`<option value="${esc(p.name)}">${esc(p.tag)}</option>`).join('');
+  const mOpts=METHODS.map(m=>`<option>${m}</option>`).join(''),cOpts=CASH_METHODS.map(m=>`<option>${m}</option>`).join('');
+  fillSelect($('#pMethod'),mOpts);fillSelect($('#quickMethod'),cOpts);fillSelect($('#wMethod'),cOpts);
+  orderPreview();
+
+  $('#oTable').innerHTML=`<thead><tr><th>日期</th><th>店家</th><th>平台</th><th class="r">人／杯</th><th class="r">費用淨額</th><th>分攤</th><th class="r">總金額</th><th class="r">未收</th><th></th></tr></thead><tbody>`+
+    (sortedOrders().map(o=>{const c=calcOrder(o);return `<tr class="${o.id===editOid?'sel':''}"><td>${sdate(o.date)}</td><td>${esc(o.shop)}</td><td>${esc(o.platform)}</td><td class="r">${c.rows.length}／${c.cups}</td><td class="r">${money(c.net)}</td><td>每${c.isCup?'杯':'人'} ${money(c.unit)}</td><td class="r">${money(c.grand)}</td><td class="r">${money(c.remain)}</td><td class="r"><button class="btn ghost sm" data-oedit="${o.id}">編輯</button><button class="btn danger sm" data-odel="${o.id}">刪除</button></td></tr>`}).join('')||'<tr><td colspan="9" class="note">尚無訂單</td></tr>')+'</tbody>';
+
+  const io=O($('#iOrder').value);
+  $('#iTable').innerHTML=io?`<thead><tr><th>訂購人</th><th>品項</th><th class="r">杯數</th><th class="r">單價</th><th class="r">金額</th><th>備註</th><th></th></tr></thead><tbody>`+
+    ([...io.items].sort(byPerson).map(it=>{const k=`data-o="${io.id}" data-i="${it.id}"`;return `<tr><td><select class="ie" data-ie="pid" ${k}>${peopleOpts(it.pid)}</select></td><td><input class="ie" data-ie="item" ${k} value="${esc(it.item)}"></td><td class="r"><input class="ie n" type="number" min="1" data-ie="qty" ${k} value="${it.qty}"></td><td class="r"><input class="ie n" type="number" data-ie="price" ${k} value="${it.price}"></td><td class="r">${money(it.qty*it.price)}</td><td><input class="ie" data-ie="note" ${k} value="${esc(it.note)}" placeholder="—"></td><td class="r"><button class="btn danger sm" data-idel="${io.id}|${it.id}">刪除</button></td></tr>`}).join('')||'<tr><td colspan="7" class="note">這張訂單還沒有品項</td></tr>')+'</tbody>':'';
+
+  const po=O($('#pOrder').value),pc=po?calcOrder(po):null;
+  fillSelect($('#pPerson'),pc&&pc.rows.length?pc.rows.map(r=>`<option value="${r.pid}">${esc((P(r.pid).tag?'('+P(r.pid).tag+') ':'')+P(r.pid).name)}</option>`).join(''):'<option value="">（這天沒有訂購人）</option>');
+  updatePayInfo();renderCollect();
+
+  const owe=[];sortedOrders().forEach(o=>calcOrder(o).rows.forEach(r=>{if(r.remain>0)owe.push({o,r})}));
+  $('#owTable').innerHTML=`<thead><tr><th>日期</th><th>姓名</th><th class="r">應付</th><th class="r">已付</th><th class="r">剩餘金額</th><th></th></tr></thead><tbody>`+
+    (owe.map(({o,r})=>`<tr><td>${sdate(o.date)}</td><td>${pLink(r.pid)}</td><td class="r">${money(r.due)}</td><td class="r">${money(r.paid)}</td><td class="r" style="color:var(--warn);font-weight:700">${money(r.remain)}</td><td class="r" style="white-space:nowrap">${wallet(r.pid).bal>0?`<button class="btn ghost sm" data-wpay="${o.id}|${r.pid}">扣零用金（餘 ${money(wallet(r.pid).bal)}）</button> `:''}<button class="btn sm" data-payoff="${o.id}|${r.pid}">一鍵付清</button></td></tr>`).join('')||'<tr><td colspan="6" class="note">🎉 全部都付清了</td></tr>')+
+    (owe.length?`<tr><td colspan="4" class="note">合計 ${owe.length} 筆</td><td class="r"><b>${money(owe.reduce((a,x)=>a+x.r.remain,0))}</b></td><td></td></tr>`:'')+'</tbody>';
+
+  const pays=[...S.payments].sort((a,b)=>(a.payDate||'').localeCompare(b.payDate||'')||a.ts-b.ts);
+  const run={},left={};
+  pays.forEach(p=>{const o=O(p.oid);if(!o)return;const k=p.oid+'|'+p.pid,r=calcOrder(o).rows.find(x=>x.pid===p.pid);run[k]=(run[k]||0)+(+p.amount||0);left[p.id]=r?r.due-run[k]:null});
+  $('#pTable').innerHTML=`<thead><tr><th>日期</th><th>姓名</th><th>付款日期</th><th>付款方式</th><th class="r">付款金額</th><th class="r">剩餘金額</th><th></th></tr></thead><tbody>`+
+    (pays.reverse().map(p=>{const o=O(p.oid);return `<tr><td>${o?sdate(o.date):'(已刪)'}</td><td>${pLink(p.pid)}</td><td><input class="ie" type="date" data-pe="payDate" data-id="${p.id}" value="${esc(p.payDate)}" style="min-width:130px"></td><td><select class="ie" data-pe="method" data-id="${p.id}">${METHODS.map(m=>`<option ${m===p.method?'selected':''}>${m}</option>`).join('')}</select></td><td class="r"><input class="ie n" type="number" data-pe="amount" data-id="${p.id}" value="${p.amount}"></td><td class="r">${left[p.id]==null?'-':money(left[p.id])}</td><td class="r"><button class="btn danger sm" data-pdel="${p.id}">刪除</button></td></tr>`}).join('')||'<tr><td colspan="7" class="note">尚無付款紀錄</td></tr>')+'</tbody>';
+
+  const wp=S.people.filter(p=>S.deposits.some(d=>d.pid===p.id));
+  $('#wBal').innerHTML=`<thead><tr><th>姓名</th><th class="r">儲值合計</th><th class="r">已扣</th><th class="r">餘額</th><th class="r">目前欠款</th><th></th></tr></thead><tbody>`+
+    (wp.map(p=>{const s=personSum(p.id);return `<tr><td>${pLink(p.id)}</td><td class="r">${money(s.dep)}</td><td class="r">${money(s.used)}</td><td class="r"><span class="wal">${money(s.bal)}</span></td><td class="r" style="color:${s.owe>0?'var(--warn)':'inherit'}">${money(s.owe)}</td><td class="r">${s.bal>0&&s.owe>0?`<button class="btn sm" data-wded="${p.id}">扣款 ${money(Math.min(s.bal,s.owe))}</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="6" class="note">還沒有人儲值</td></tr>')+'</tbody>';
+  $('#wTable').innerHTML=`<thead><tr><th>姓名</th><th>儲值日期</th><th class="r">金額</th><th>方式</th><th>備註</th><th></th></tr></thead><tbody>`+
+    ([...S.deposits].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(d=>`<tr><td>${pLink(d.pid)}</td><td><input class="ie" type="date" data-de="date" data-id="${d.id}" value="${esc(d.date)}" style="min-width:130px"></td><td class="r"><input class="ie n" type="number" data-de="amount" data-id="${d.id}" value="${d.amount}"></td><td><select class="ie" data-de="method" data-id="${d.id}">${CASH_METHODS.map(m=>`<option ${m===d.method?'selected':''}>${m}</option>`).join('')}</select></td><td><input class="ie" data-de="note" data-id="${d.id}" value="${esc(d.note)}" placeholder="—"></td><td class="r"><button class="btn danger sm" data-ddel="${d.id}">刪除</button></td></tr>`).join('')||'<tr><td colspan="6" class="note">尚無儲值紀錄</td></tr>')+'</tbody>';
+
+  $('#tagList').innerHTML=S.tags.map(t=>tagHtml(t).replace('</span>',`<button data-tdel="${esc(t)}" title="刪除">×</button></span>`)).join('')||'<span class="hint">尚無小標</span>';
+  $('#peTable').innerHTML=`<thead><tr><th>姓名</th><th>小標</th><th class="r">次數</th><th class="r">總額</th><th class="r">未付</th><th></th></tr></thead><tbody>`+
+    ([...S.people].sort((a,b)=>byPerson({pid:a.id},{pid:b.id})).map(p=>{let n=0,due=0,rem=0;S.orders.forEach(o=>{const r=calcOrder(o).rows.find(x=>x.pid===p.id);if(r){n++;due+=r.due;rem+=r.remain}});
+      return `<tr><td><input value="${esc(p.name)}" data-pname="${p.id}" style="width:120px"></td><td><select data-ptag="${p.id}"><option value="">（無）</option>${S.tags.map(t=>`<option ${t===p.tag?'selected':''}>${esc(t)}</option>`).join('')}</select></td><td class="r">${n}</td><td class="r">${money(due)}</td><td class="r">${money(rem)}</td><td class="r"><button class="btn ghost sm" data-pid="${p.id}">紀錄</button><button class="btn danger sm" data-pedel="${p.id}">刪除</button></td></tr>`}).join('')||'<tr><td colspan="6" class="note">尚無人員，登記品項時會自動建立</td></tr>')+'</tbody>';
+}
+function renderCollect(){
+  const ppl=[...S.people].map(p=>({p,s:personSum(p.id)})).sort((a,b)=>(b.s.owe>0)-(a.s.owe>0)||byPerson({pid:a.p.id},{pid:b.p.id}));
+  fillSelect($('#cPerson'),'<option value="">— 選擇要收款的人 —</option>'+ppl.map(({p,s})=>`<option value="${p.id}">${esc((p.tag?'('+p.tag+') ':'')+p.name)}${s.owe>0?'｜欠 '+money(s.owe):'｜已付清'}</option>`).join(''));
+  fillSelect($('#cMethod'),METHODS.map(m=>`<option>${m}</option>`).join(''));
+  const pid=$('#cPerson').value;
+  if(!pid){$('#cInfo').innerHTML='<div class="preview">選一個人，會列出他所有未付的訂單，可以一次繳清</div>';return}
+  const s=personSum(pid),hasW=s.dep||s.used;
+  if(!s.list.length){$('#cInfo').innerHTML=`<div class="preview">${pLink(pid)} 目前沒有欠款 🎉${hasW?`　零用金餘額 <span class="wal">${money(s.bal)}</span>`:''}</div>`;return}
+  const rows=s.list.map(({o,r})=>`<tr><td>${sdate(o.date)}</td><td>${esc(o.shop)}</td><td class="note">${r.items.map(i=>esc(i.item)+(i.qty>1?'×'+i.qty:'')).join('、')}</td><td class="r">${money(r.due)}</td><td class="r">${money(r.paid)}</td><td class="r" style="color:var(--warn);font-weight:700">${money(r.remain)}</td></tr>`).join('');
+  const wAmt=Math.min(s.bal,s.owe);
+  $('#cInfo').innerHTML=`<div class="tblwrap"><table class="tbl"><thead><tr><th>日期</th><th>店家</th><th>品項</th><th class="r">應付</th><th class="r">已付</th><th class="r">剩餘</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="preview" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>${pLink(pid)}　共 ${s.cnt} 筆未付，合計 <b style="color:var(--warn);font-size:18px">${money(s.owe)}</b>${hasW?`　零用金餘額 <span class="wal">${money(s.bal)}</span>`:''}</div>
+      <div class="row">${wAmt>0?`<button class="btn ghost" id="cWallet">先扣零用金 ${money(wAmt)}</button>`:''}<button class="btn" id="cPayAll">一次繳清 ${money(s.owe)}</button></div>
+    </div>`;
+  if(wAmt>0)$('#cWallet').onclick=()=>{const ops=walletDeduct(pid);if(ops.length)commit(ops)};
+  $('#cPayAll').onclick=()=>{
+    const m=$('#cMethod').value;
+    if(m===WALLET&&s.owe>s.bal&&!confirm(`零用金餘額只有 ${money(s.bal)}，全部用零用金扣會變負數，確定？`))return;
+    if(!confirm(`${P(pid).name}：${s.cnt} 筆共 ${money(s.owe)}，以「${m}」一次繳清？`))return;
+    const ops=s.list.map(({o,r},k)=>{const p={id:uid(),oid:o.id,pid,payDate:$('#cDate').value||today(),method:m,amount:r.remain,ts:Date.now()+k};S.payments.push(p);return['payments/'+p.id,p]});
+    commit(ops);
+  };
+}
+function updatePayInfo(){
+  const o=O($('#pOrder').value),pid=$('#pPerson').value;
+  const r=o&&pid?calcOrder(o).rows.find(x=>x.pid===pid):null;
+  if(!r){$('#pInfo').textContent='請先選訂單與姓名';return}
+  $('#pInfo').innerHTML=`應付 <b>${money(r.due)}</b>（飲料 ${money(r.sub)}，費用 ${money(r.share)}）・已付 ${money(r.paid)}・剩餘 <b style="color:${r.remain>0?'var(--warn)':'var(--ok)'}">${money(r.remain)}</b>`;
+  $('#pAmount').value=Math.max(r.remain,0);
+}
+function orderPreview(){
+  const o={ship:$('#oShip').value,service:$('#oService').value,other:$('#oOther').value,discount:$('#oDiscount').value};
+  const f=feeOf(o);
+  $('#oPreview').innerHTML=`加收 ${money(f.add)} － 折扣 ${money(f.disc)} ＝ 費用淨額 <b>${money(f.net)}</b>，會依${$('#oMode').value==='cup'?'杯數':'人數'}自動平均，除不盡無條件進位`;
+}
+['#oShip','#oService','#oOther','#oDiscount','#oMode'].forEach(s=>$(s).addEventListener('input',orderPreview));
+
+/* ---- 訂單 ---- */
+function resetOrderForm(){editOid=null;$('#oDate').value=today();$('#oShop').value='';$('#oPlatform').value='';['#oShip','#oService','#oOther','#oDiscount'].forEach(s=>$(s).value=0);$('#oMode').value='person';$('#oSave').textContent='新增訂單';$('#oCancel').hidden=true;orderPreview()}
+const num=s=>Math.abs(+$(s).value||0);
+$('#oSave').onclick=()=>{
+  const d={date:$('#oDate').value,shop:$('#oShop').value.trim(),platform:$('#oPlatform').value.trim(),ship:num('#oShip'),service:num('#oService'),other:num('#oOther'),discount:num('#oDiscount'),mode:$('#oMode').value};
+  if(!d.date)return alert('請選日期');
+  let o;
+  if(editOid){o=O(editOid);Object.assign(o,d)}else{o={id:uid(),items:[],...d};S.orders.push(o);pendingOid=o.id}
+  resetOrderForm();commit([['orders/'+o.id,o]]);
+};
+$('#oCancel').onclick=()=>{resetOrderForm();renderBack()};
+
+/* ---- 品項 ---- */
+$('#iName').addEventListener('input',()=>{const p=S.people.find(x=>x.name===$('#iName').value.trim());if(p)$('#iTag').value=p.tag||''});
+function addItem(){
+  const o=O($('#iOrder').value);if(!o)return alert('請先新增訂單');
+  const name=$('#iName').value.trim(),item=$('#iItem').value.trim();
+  if(!name)return alert('請輸入訂購人');if(!item)return alert('請輸入品項');
+  const tag=$('#iTag').value;
+  let p=S.people.find(x=>x.name===name);
+  if(!p){p={id:uid(),name,tag};S.people.push(p)}else if(tag&&tag!==p.tag)p.tag=tag;
+  o.items.push({id:uid(),pid:p.id,item,qty:+$('#iQty').value||1,price:+$('#iPrice').value||0,note:$('#iNote').value.trim()});
+  $('#iItem').value='';$('#iPrice').value='';$('#iNote').value='';$('#iQty').value=1;
+  commit([['orders/'+o.id,o],['people/'+p.id,p]]);$('#iItem').focus();
+}
+$('#iAdd').onclick=addItem;
+['#iName','#iItem','#iQty','#iPrice','#iNote'].forEach(s=>$(s).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addItem()}}));
+$('#iOrder').onchange=renderBack;
+
+/* ---- 付款 ---- */
+$('#pOrder').onchange=renderBack;$('#cPerson').onchange=renderCollect;$('#pPerson').onchange=updatePayInfo;
+$('#pAdd').onclick=()=>{
+  const oid=$('#pOrder').value,pid=$('#pPerson').value,amt=+$('#pAmount').value;
+  if(!O(oid)||!pid)return alert('請選訂單與姓名');if(!amt)return alert('請輸入付款金額');
+  if($('#pMethod').value===WALLET){const b=wallet(pid).bal;if(amt>b&&!confirm(`零用金餘額只有 ${money(b)}，扣 ${money(amt)} 會變負數，確定？`))return}
+  const p={id:uid(),oid,pid,payDate:$('#pDate').value||today(),method:$('#pMethod').value,amount:amt,ts:Date.now()};
+  S.payments.push(p);commit([['payments/'+p.id,p]]);
+};
+
+/* ---- 零用金 ---- */
+$('#wAdd').onclick=()=>{
+  const name=$('#wName').value.trim(),amt=+$('#wAmount').value;
+  if(!name)return alert('請輸入姓名');if(!amt)return alert('請輸入金額');
+  let p=S.people.find(x=>x.name===name),ops=[];
+  if(!p){if(!confirm(`「${name}」還沒建檔，要新增這個人嗎？`))return;p={id:uid(),name,tag:''};S.people.push(p);ops.push(['people/'+p.id,p])}
+  const d={id:uid(),pid:p.id,date:$('#wDate').value||today(),amount:amt,method:$('#wMethod').value,note:$('#wNote').value.trim(),ts:Date.now()};
+  S.deposits.push(d);ops.push(['deposits/'+d.id,d]);
+  $('#wName').value='';$('#wAmount').value='';$('#wNote').value='';commit(ops);
+};
+$('#wAuto').onclick=()=>{
+  const ops=[];S.people.forEach(p=>{if(wallet(p.id).bal>0)ops.push(...walletDeduct(p.id))});
+  if(!ops.length)return alert('目前沒有可以扣的款項');
+  const total=ops.reduce((a,o)=>a+o[1].amount,0);
+  if(!confirm(`將扣款 ${ops.length} 筆，共 ${money(total)}，確定？`)){S.payments=S.payments.filter(p=>!ops.some(o=>o[1].id===p.id));return renderAll()}
+  commit(ops);
+};
+
+/* ---- 小標 ---- */
+$('#tagAdd').onclick=()=>{const t=$('#tagIn').value.trim().replace(/^[（(]|[)）]$/g,'');if(!t)return;if(!S.tags.includes(t))S.tags.push(t);$('#tagIn').value='';commit([['tags',S.tags]])};
+
+/* ---- 點擊 ---- */
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-pid],[data-wpay],[data-wded],[data-ddel],[data-oedit],[data-odel],[data-idel],[data-pdel],[data-payoff],[data-tdel],[data-pedel]');if(!t)return;
+  const ds=t.dataset;
+  if(ds.pid&&!ds.pedel)return openPerson(ds.pid,'');
+  if(ds.wpay){const[oid,pid]=ds.wpay.split('|');const r=calcOrder(O(oid)).rows.find(x=>x.pid===pid);const amt=Math.min(wallet(pid).bal,r.remain);if(amt<=0)return;const p={id:uid(),oid,pid,payDate:today(),method:WALLET,amount:amt,ts:Date.now()};S.payments.push(p);return commit([['payments/'+p.id,p]])}
+  if(ds.wded){const ops=walletDeduct(ds.wded);if(ops.length)commit(ops);return}
+  if(ds.ddel){if(!confirm('刪除這筆儲值紀錄？'))return;S.deposits=S.deposits.filter(d=>d.id!==ds.ddel);return commit([['deposits/'+ds.ddel,null]])}
+  if(ds.oedit){const o=O(ds.oedit);editOid=o.id;$('#oDate').value=o.date;$('#oShop').value=o.shop;$('#oPlatform').value=o.platform||'';$('#oShip').value=o.ship;$('#oService').value=o.service;$('#oOther').value=o.other;$('#oDiscount').value=o.discount;$('#oMode').value=o.mode;$('#oSave').textContent='更新訂單';$('#oCancel').hidden=false;renderBack();return $('#oDate').scrollIntoView({behavior:'smooth',block:'center'})}
+  if(ds.odel){const o=O(ds.odel);if(!confirm(`刪除 ${orderLabel(o)} 的訂單？品項與付款紀錄會一起刪除`))return;const gone=S.payments.filter(p=>p.oid===o.id);S.orders=S.orders.filter(x=>x.id!==o.id);S.payments=S.payments.filter(p=>p.oid!==o.id);return commit([['orders/'+o.id,null],...gone.map(p=>['payments/'+p.id,null])])}
+  if(ds.idel){const[oid,iid]=ds.idel.split('|');const o=O(oid);o.items=o.items.filter(i=>i.id!==iid);return commit([['orders/'+o.id,o]])}
+  if(ds.pdel){if(!confirm('刪除這筆付款紀錄？'))return;S.payments=S.payments.filter(p=>p.id!==ds.pdel);return commit([['payments/'+ds.pdel,null]])}
+  if(ds.payoff){const[oid,pid]=ds.payoff.split('|');const r=calcOrder(O(oid)).rows.find(x=>x.pid===pid);const p={id:uid(),oid,pid,payDate:today(),method:$('#quickMethod').value,amount:r.remain,ts:Date.now()};S.payments.push(p);return commit([['payments/'+p.id,p]])}
+  if(ds.tdel){if(!confirm(`刪除小標「${ds.tdel}」？已套用的人員會變成無小標`))return;S.tags=S.tags.filter(x=>x!==ds.tdel);const ch=S.people.filter(p=>p.tag===ds.tdel);ch.forEach(p=>p.tag='');return commit([['tags',S.tags],...ch.map(p=>['people/'+p.id,p])])}
+  if(ds.pedel){if(S.orders.some(o=>o.items.some(i=>i.pid===ds.pedel))||S.deposits.some(d=>d.pid===ds.pedel))return alert('此人還有訂購或儲值紀錄，請先刪除相關資料');S.people=S.people.filter(p=>p.id!==ds.pedel);return commit([['people/'+ds.pedel,null]])}
+});
+document.addEventListener('change',e=>{
+  const ds=e.target.dataset,v=e.target.value;
+  if(ds.ie){const o=O(ds.o),it=o&&o.items.find(x=>x.id===ds.i);if(!it)return;
+    if(ds.ie==='qty'||ds.ie==='price'){const n=+v;if(ds.ie==='qty'&&!(n>=1))return renderBack();it[ds.ie]=n||0}
+    else if(ds.ie==='item'){if(!v.trim())return renderBack();it.item=v.trim()}
+    else it[ds.ie]=ds.ie==='note'?v.trim():v;
+    return commit([['orders/'+o.id,o]])}
+  if(ds.pe){const p=S.payments.find(x=>x.id===ds.id);if(!p)return;p[ds.pe]=ds.pe==='amount'?(+v||0):v;return commit([['payments/'+p.id,p]])}
+  if(ds.de){const d=S.deposits.find(x=>x.id===ds.id);if(!d)return;d[ds.de]=ds.de==='amount'?(+v||0):ds.de==='note'?v.trim():v;return commit([['deposits/'+d.id,d]])}
+  if(ds.ptag){const p=P(ds.ptag);p.tag=e.target.value;commit([['people/'+p.id,p]])}
+  if(ds.pname){const v=e.target.value.trim();if(!v)return renderBack();if(S.people.some(p=>p.name===v&&p.id!==ds.pname)){alert('已有同名人員');return renderBack()}const p=P(ds.pname);p.name=v;commit([['people/'+p.id,p]])}
+});
+
+/* ---- 匯出 Excel ---- */
+$('#dXlsx').onclick=()=>{
+  if(!window.XLSX)return alert('Excel 元件載入失敗，請確認網路後重新整理');
+  const asc=[...S.orders].sort((a,b)=>a.date.localeCompare(b.date));
+  const sheet=(rows,widths)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=widths.map(w=>({wch:w}));return ws};
+  const summary=[['日期','店家','訂購平台','分攤方式','小標','姓名','杯數','飲料小計','分攤費用','應付','已付','剩餘']];
+  const items=[['日期','店家','訂購平台','小標','姓名','品項','杯數','單價','金額','備註']];
+  asc.forEach(o=>{const c=calcOrder(o);c.rows.forEach(r=>{const p=P(r.pid);
+    summary.push([o.date,o.shop,o.platform||'',c.isCup?'杯數平均':'訂購人平均',p.tag,p.name,r.cups,r.sub,r.share,r.due,r.paid,r.remain]);
+    r.items.forEach(it=>items.push([o.date,o.shop,o.platform||'',p.tag,p.name,it.item,+it.qty,+it.price,it.amt,it.note]))})});
+  const pays=[['訂單日期','小標','姓名','付款日期','付款方式','付款金額']];
+  [...S.payments].sort((a,b)=>(a.payDate||'').localeCompare(b.payDate||'')).forEach(x=>{const o=O(x.oid),p=P(x.pid);pays.push([o?o.date:'(已刪)',p.tag,p.name,x.payDate,x.method,+x.amount])});
+  const dep=[['儲值日期','小標','姓名','金額','方式','備註']];
+  [...S.deposits].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(d=>{const p=P(d.pid);dep.push([d.date,p.tag,p.name,+d.amount,d.method,d.note])});
+  const ppl=[['小標','姓名','訂購次數','消費總額','目前欠款','零用金儲值','零用金已扣','零用金餘額']];
+  [...S.people].sort((a,b)=>byPerson({pid:a.id},{pid:b.id})).forEach(p=>{const s=personSum(p.id);const n=S.orders.filter(o=>o.items.some(i=>i.pid===p.id)).length;ppl.push([p.tag,p.name,n,s.due,s.owe,s.dep,s.used,s.bal])});
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,sheet(summary,[12,12,12,11,10,10,6,10,10,10,10,10]),'帳務總表');
+  XLSX.utils.book_append_sheet(wb,sheet(items,[12,12,12,10,10,22,6,8,8,20]),'品項明細');
+  XLSX.utils.book_append_sheet(wb,sheet(pays,[12,10,10,12,10,10]),'付款紀錄');
+  XLSX.utils.book_append_sheet(wb,sheet(dep,[12,10,10,10,10,20]),'零用金');
+  XLSX.utils.book_append_sheet(wb,sheet(ppl,[10,10,9,10,10,11,11,11]),'人員總覽');
+  XLSX.writeFile(wb,`飲料算錢台_${today()}.xlsx`);
+};
+
+/* ---- 分頁與登入 ---- */
+function showBack(){
+  const ok=sessionStorage.getItem('drinkUnlock')==='1';
+  $('#lockBox').hidden=ok;$('#backBody').hidden=!ok;
+  if(ok)renderBack();else setTimeout(()=>$('#pinIn').focus());
+}
+$('#pinBtn').onclick=()=>{if($('#pinIn').value===S.settings.pin){sessionStorage.setItem('drinkUnlock','1');$('#pinIn').value='';showBack()}else alert('密碼錯誤')};
+$('#pinIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('#pinBtn').click()});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
+  $('#front').hidden=b.dataset.tab!=='front';$('#back').hidden=b.dataset.tab!=='back';
+  if(b.dataset.tab==='back')showBack();else renderFront();
+});
+$('#fOrder').onchange=renderFront;$('#fSearch').oninput=renderFront;
+function renderAll(){renderFront();renderBack()}
+
+resetOrderForm();$('#pDate').value=today();$('#wDate').value=today();$('#cDate').value=today();renderAll();
+</script>
+</body>
+</html>
