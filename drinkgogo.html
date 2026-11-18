@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>飲料算錢台 V5</title>
+<title>飲料算錢台 V7</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -108,7 +108,7 @@ select.ie{min-width:90px}
 </head>
 <body>
 <header>
-  <h1>🧋 飲料算錢台<span class="ver">V5</span></h1>
+  <h1>🧋 飲料算錢台<span class="ver">V7</span></h1>
   <div class="hright"><span class="conn" id="conn">💾 本機模式</span>
   <nav><button data-tab="front" class="active">前台</button><button data-tab="back">後台</button></nav></div>
 </header>
@@ -134,6 +134,8 @@ select.ie{min-width:90px}
       <div class="grid">
         <label>日期<input type="date" id="oDate"></label>
         <label>店家<input id="oShop" placeholder="例：五十嵐"></label>
+        <label>訂購平台<input id="oPlatform" list="platformList" placeholder="可選或自行輸入"></label>
+        <datalist id="platformList"><option>Uber Eats</option><option>foodpanda</option><option>店家 App／LINE</option><option>電話訂購</option><option>現場自取</option></datalist>
         <label>分攤方式<select id="oMode"><option value="person">訂購人平均</option><option value="cup">杯數平均</option></select></label>
         <label>運費（＋）<input type="number" id="oShip" min="0" value="0"></label>
         <label>服務費（＋）<input type="number" id="oService" min="0" value="0"></label>
@@ -167,6 +169,14 @@ select.ie{min-width:90px}
     </div></details>
 
     <details class="sec" open><summary>③ 付款紀錄</summary><div class="in">
+      <h3 style="margin-top:0">依人員收款</h3>
+      <div class="grid">
+        <label>姓名<select id="cPerson"></select></label>
+        <label>付款日期<input type="date" id="cDate"></label>
+        <label>付款方式<select id="cMethod"></select></label>
+      </div>
+      <div id="cInfo" style="margin-top:10px"></div>
+      <h3>單筆付款</h3>
       <div class="grid">
         <label>日期（訂單）<select id="pOrder"></select></label>
         <label>姓名<select id="pPerson"></select></label>
@@ -328,7 +338,7 @@ function calcOrder(o){
 }
 function chip(remain){return remain===0?'<span class="chip ok">已付清</span>':remain>0?'<span class="chip no">待付</span>':'<span class="chip over">溢付 '+money(-remain)+'</span>'}
 const sortedOrders=()=>[...S.orders].sort((a,b)=>b.date.localeCompare(a.date));
-const orderLabel=o=>fdate(o.date)+(o.shop?'　'+o.shop:'');
+const orderLabel=o=>fdate(o.date)+(o.shop?'　'+o.shop:'')+(o.platform?'（'+o.platform+'）':'');
 
 /* ===== 零用金 ===== */
 function wallet(pid){
@@ -399,7 +409,7 @@ function orderCard(o,q){
     return '<tbody class="grp">'+r.items.map((it,i)=>`<tr>${i?'':`<td${rs}>${pLink(r.pid)}</td>`}<td>${esc(it.item)}${it.note?`<span class="itn">${esc(it.note)}</span>`:''}</td><td class="r">${it.qty}</td><td class="r">${money(it.amt)}</td>${i?'':`<td${rs} class="r fee">${r.share>0?'+':''}${money(r.share)}</td><td${rs} class="r"><b>${money(r.due)}</b></td><td${rs} class="r">${chip(r.remain)}</td>`}</tr>`).join('')+'</tbody>';
   }).join('');
   return `<article class="card">
-    <div class="card-h"><div><div class="d">${fdate(o.date)}</div><div class="meta">${esc(o.shop||'未填店家')}・${c.rows.length} 人・${c.cups} 杯</div></div>
+    <div class="card-h"><div><div class="d">${fdate(o.date)}</div><div class="meta">${esc(o.shop||'未填店家')}${o.platform?'・'+esc(o.platform):''}・${c.rows.length} 人・${c.cups} 杯</div></div>
       <span class="modetag">費用依${c.isCup?'杯數':'訂購人'}平均</span></div>
     <div class="tblwrap"><table class="tbl"><thead><tr><th>訂購人</th><th>品項／備註</th><th class="r">杯數</th><th class="r">金額</th><th class="r">費用</th><th class="r">應付</th><th class="r">狀態</th></tr></thead>
       ${body||'<tbody><tr><td colspan="7" class="note">尚無品項</td></tr></tbody>'}</table></div>
@@ -447,8 +457,8 @@ function renderBack(){
   fillSelect($('#pMethod'),mOpts);fillSelect($('#quickMethod'),cOpts);fillSelect($('#wMethod'),cOpts);
   orderPreview();
 
-  $('#oTable').innerHTML=`<thead><tr><th>日期</th><th>店家</th><th class="r">人／杯</th><th class="r">費用淨額</th><th>分攤</th><th class="r">總金額</th><th class="r">未收</th><th></th></tr></thead><tbody>`+
-    (sortedOrders().map(o=>{const c=calcOrder(o);return `<tr class="${o.id===editOid?'sel':''}"><td>${sdate(o.date)}</td><td>${esc(o.shop)}</td><td class="r">${c.rows.length}／${c.cups}</td><td class="r">${money(c.net)}</td><td>每${c.isCup?'杯':'人'} ${money(c.unit)}</td><td class="r">${money(c.grand)}</td><td class="r">${money(c.remain)}</td><td class="r"><button class="btn ghost sm" data-oedit="${o.id}">編輯</button><button class="btn danger sm" data-odel="${o.id}">刪除</button></td></tr>`}).join('')||'<tr><td colspan="8" class="note">尚無訂單</td></tr>')+'</tbody>';
+  $('#oTable').innerHTML=`<thead><tr><th>日期</th><th>店家</th><th>平台</th><th class="r">人／杯</th><th class="r">費用淨額</th><th>分攤</th><th class="r">總金額</th><th class="r">未收</th><th></th></tr></thead><tbody>`+
+    (sortedOrders().map(o=>{const c=calcOrder(o);return `<tr class="${o.id===editOid?'sel':''}"><td>${sdate(o.date)}</td><td>${esc(o.shop)}</td><td>${esc(o.platform)}</td><td class="r">${c.rows.length}／${c.cups}</td><td class="r">${money(c.net)}</td><td>每${c.isCup?'杯':'人'} ${money(c.unit)}</td><td class="r">${money(c.grand)}</td><td class="r">${money(c.remain)}</td><td class="r"><button class="btn ghost sm" data-oedit="${o.id}">編輯</button><button class="btn danger sm" data-odel="${o.id}">刪除</button></td></tr>`}).join('')||'<tr><td colspan="9" class="note">尚無訂單</td></tr>')+'</tbody>';
 
   const io=O($('#iOrder').value);
   $('#iTable').innerHTML=io?`<thead><tr><th>訂購人</th><th>品項</th><th class="r">杯數</th><th class="r">單價</th><th class="r">金額</th><th>備註</th><th></th></tr></thead><tbody>`+
@@ -456,7 +466,7 @@ function renderBack(){
 
   const po=O($('#pOrder').value),pc=po?calcOrder(po):null;
   fillSelect($('#pPerson'),pc&&pc.rows.length?pc.rows.map(r=>`<option value="${r.pid}">${esc((P(r.pid).tag?'('+P(r.pid).tag+') ':'')+P(r.pid).name)}</option>`).join(''):'<option value="">（這天沒有訂購人）</option>');
-  updatePayInfo();
+  updatePayInfo();renderCollect();
 
   const owe=[];sortedOrders().forEach(o=>calcOrder(o).rows.forEach(r=>{if(r.remain>0)owe.push({o,r})}));
   $('#owTable').innerHTML=`<thead><tr><th>日期</th><th>姓名</th><th class="r">應付</th><th class="r">已付</th><th class="r">剩餘金額</th><th></th></tr></thead><tbody>`+
@@ -480,6 +490,30 @@ function renderBack(){
     ([...S.people].sort((a,b)=>byPerson({pid:a.id},{pid:b.id})).map(p=>{let n=0,due=0,rem=0;S.orders.forEach(o=>{const r=calcOrder(o).rows.find(x=>x.pid===p.id);if(r){n++;due+=r.due;rem+=r.remain}});
       return `<tr><td><input value="${esc(p.name)}" data-pname="${p.id}" style="width:120px"></td><td><select data-ptag="${p.id}"><option value="">（無）</option>${S.tags.map(t=>`<option ${t===p.tag?'selected':''}>${esc(t)}</option>`).join('')}</select></td><td class="r">${n}</td><td class="r">${money(due)}</td><td class="r">${money(rem)}</td><td class="r"><button class="btn ghost sm" data-pid="${p.id}">紀錄</button><button class="btn danger sm" data-pedel="${p.id}">刪除</button></td></tr>`}).join('')||'<tr><td colspan="6" class="note">尚無人員，登記品項時會自動建立</td></tr>')+'</tbody>';
 }
+function renderCollect(){
+  const ppl=[...S.people].map(p=>({p,s:personSum(p.id)})).sort((a,b)=>(b.s.owe>0)-(a.s.owe>0)||byPerson({pid:a.p.id},{pid:b.p.id}));
+  fillSelect($('#cPerson'),'<option value="">— 選擇要收款的人 —</option>'+ppl.map(({p,s})=>`<option value="${p.id}">${esc((p.tag?'('+p.tag+') ':'')+p.name)}${s.owe>0?'｜欠 '+money(s.owe):'｜已付清'}</option>`).join(''));
+  fillSelect($('#cMethod'),METHODS.map(m=>`<option>${m}</option>`).join(''));
+  const pid=$('#cPerson').value;
+  if(!pid){$('#cInfo').innerHTML='<div class="preview">選一個人，會列出他所有未付的訂單，可以一次繳清</div>';return}
+  const s=personSum(pid),hasW=s.dep||s.used;
+  if(!s.list.length){$('#cInfo').innerHTML=`<div class="preview">${pLink(pid)} 目前沒有欠款 🎉${hasW?`　零用金餘額 <span class="wal">${money(s.bal)}</span>`:''}</div>`;return}
+  const rows=s.list.map(({o,r})=>`<tr><td>${sdate(o.date)}</td><td>${esc(o.shop)}</td><td class="note">${r.items.map(i=>esc(i.item)+(i.qty>1?'×'+i.qty:'')).join('、')}</td><td class="r">${money(r.due)}</td><td class="r">${money(r.paid)}</td><td class="r" style="color:var(--warn);font-weight:700">${money(r.remain)}</td></tr>`).join('');
+  const wAmt=Math.min(s.bal,s.owe);
+  $('#cInfo').innerHTML=`<div class="tblwrap"><table class="tbl"><thead><tr><th>日期</th><th>店家</th><th>品項</th><th class="r">應付</th><th class="r">已付</th><th class="r">剩餘</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="preview" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>${pLink(pid)}　共 ${s.cnt} 筆未付，合計 <b style="color:var(--warn);font-size:18px">${money(s.owe)}</b>${hasW?`　零用金餘額 <span class="wal">${money(s.bal)}</span>`:''}</div>
+      <div class="row">${wAmt>0?`<button class="btn ghost" id="cWallet">先扣零用金 ${money(wAmt)}</button>`:''}<button class="btn" id="cPayAll">一次繳清 ${money(s.owe)}</button></div>
+    </div>`;
+  if(wAmt>0)$('#cWallet').onclick=()=>{const ops=walletDeduct(pid);if(ops.length)commit(ops)};
+  $('#cPayAll').onclick=()=>{
+    const m=$('#cMethod').value;
+    if(m===WALLET&&s.owe>s.bal&&!confirm(`零用金餘額只有 ${money(s.bal)}，全部用零用金扣會變負數，確定？`))return;
+    if(!confirm(`${P(pid).name}：${s.cnt} 筆共 ${money(s.owe)}，以「${m}」一次繳清？`))return;
+    const ops=s.list.map(({o,r},k)=>{const p={id:uid(),oid:o.id,pid,payDate:$('#cDate').value||today(),method:m,amount:r.remain,ts:Date.now()+k};S.payments.push(p);return['payments/'+p.id,p]});
+    commit(ops);
+  };
+}
 function updatePayInfo(){
   const o=O($('#pOrder').value),pid=$('#pPerson').value;
   const r=o&&pid?calcOrder(o).rows.find(x=>x.pid===pid):null;
@@ -495,10 +529,10 @@ function orderPreview(){
 ['#oShip','#oService','#oOther','#oDiscount','#oMode'].forEach(s=>$(s).addEventListener('input',orderPreview));
 
 /* ---- 訂單 ---- */
-function resetOrderForm(){editOid=null;$('#oDate').value=today();$('#oShop').value='';['#oShip','#oService','#oOther','#oDiscount'].forEach(s=>$(s).value=0);$('#oMode').value='person';$('#oSave').textContent='新增訂單';$('#oCancel').hidden=true;orderPreview()}
+function resetOrderForm(){editOid=null;$('#oDate').value=today();$('#oShop').value='';$('#oPlatform').value='';['#oShip','#oService','#oOther','#oDiscount'].forEach(s=>$(s).value=0);$('#oMode').value='person';$('#oSave').textContent='新增訂單';$('#oCancel').hidden=true;orderPreview()}
 const num=s=>Math.abs(+$(s).value||0);
 $('#oSave').onclick=()=>{
-  const d={date:$('#oDate').value,shop:$('#oShop').value.trim(),ship:num('#oShip'),service:num('#oService'),other:num('#oOther'),discount:num('#oDiscount'),mode:$('#oMode').value};
+  const d={date:$('#oDate').value,shop:$('#oShop').value.trim(),platform:$('#oPlatform').value.trim(),ship:num('#oShip'),service:num('#oService'),other:num('#oOther'),discount:num('#oDiscount'),mode:$('#oMode').value};
   if(!d.date)return alert('請選日期');
   let o;
   if(editOid){o=O(editOid);Object.assign(o,d)}else{o={id:uid(),items:[],...d};S.orders.push(o);pendingOid=o.id}
@@ -524,7 +558,7 @@ $('#iAdd').onclick=addItem;
 $('#iOrder').onchange=renderBack;
 
 /* ---- 付款 ---- */
-$('#pOrder').onchange=renderBack;$('#pPerson').onchange=updatePayInfo;
+$('#pOrder').onchange=renderBack;$('#cPerson').onchange=renderCollect;$('#pPerson').onchange=updatePayInfo;
 $('#pAdd').onclick=()=>{
   const oid=$('#pOrder').value,pid=$('#pPerson').value,amt=+$('#pAmount').value;
   if(!O(oid)||!pid)return alert('請選訂單與姓名');if(!amt)return alert('請輸入付款金額');
@@ -562,7 +596,7 @@ document.addEventListener('click',e=>{
   if(ds.wpay){const[oid,pid]=ds.wpay.split('|');const r=calcOrder(O(oid)).rows.find(x=>x.pid===pid);const amt=Math.min(wallet(pid).bal,r.remain);if(amt<=0)return;const p={id:uid(),oid,pid,payDate:today(),method:WALLET,amount:amt,ts:Date.now()};S.payments.push(p);return commit([['payments/'+p.id,p]])}
   if(ds.wded){const ops=walletDeduct(ds.wded);if(ops.length)commit(ops);return}
   if(ds.ddel){if(!confirm('刪除這筆儲值紀錄？'))return;S.deposits=S.deposits.filter(d=>d.id!==ds.ddel);return commit([['deposits/'+ds.ddel,null]])}
-  if(ds.oedit){const o=O(ds.oedit);editOid=o.id;$('#oDate').value=o.date;$('#oShop').value=o.shop;$('#oShip').value=o.ship;$('#oService').value=o.service;$('#oOther').value=o.other;$('#oDiscount').value=o.discount;$('#oMode').value=o.mode;$('#oSave').textContent='更新訂單';$('#oCancel').hidden=false;renderBack();return $('#oDate').scrollIntoView({behavior:'smooth',block:'center'})}
+  if(ds.oedit){const o=O(ds.oedit);editOid=o.id;$('#oDate').value=o.date;$('#oShop').value=o.shop;$('#oPlatform').value=o.platform||'';$('#oShip').value=o.ship;$('#oService').value=o.service;$('#oOther').value=o.other;$('#oDiscount').value=o.discount;$('#oMode').value=o.mode;$('#oSave').textContent='更新訂單';$('#oCancel').hidden=false;renderBack();return $('#oDate').scrollIntoView({behavior:'smooth',block:'center'})}
   if(ds.odel){const o=O(ds.odel);if(!confirm(`刪除 ${orderLabel(o)} 的訂單？品項與付款紀錄會一起刪除`))return;const gone=S.payments.filter(p=>p.oid===o.id);S.orders=S.orders.filter(x=>x.id!==o.id);S.payments=S.payments.filter(p=>p.oid!==o.id);return commit([['orders/'+o.id,null],...gone.map(p=>['payments/'+p.id,null])])}
   if(ds.idel){const[oid,iid]=ds.idel.split('|');const o=O(oid);o.items=o.items.filter(i=>i.id!==iid);return commit([['orders/'+o.id,o]])}
   if(ds.pdel){if(!confirm('刪除這筆付款紀錄？'))return;S.payments=S.payments.filter(p=>p.id!==ds.pdel);return commit([['payments/'+ds.pdel,null]])}
@@ -588,11 +622,11 @@ $('#dXlsx').onclick=()=>{
   if(!window.XLSX)return alert('Excel 元件載入失敗，請確認網路後重新整理');
   const asc=[...S.orders].sort((a,b)=>a.date.localeCompare(b.date));
   const sheet=(rows,widths)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=widths.map(w=>({wch:w}));return ws};
-  const summary=[['日期','店家','分攤方式','小標','姓名','杯數','飲料小計','分攤費用','應付','已付','剩餘']];
-  const items=[['日期','店家','小標','姓名','品項','杯數','單價','金額','備註']];
+  const summary=[['日期','店家','訂購平台','分攤方式','小標','姓名','杯數','飲料小計','分攤費用','應付','已付','剩餘']];
+  const items=[['日期','店家','訂購平台','小標','姓名','品項','杯數','單價','金額','備註']];
   asc.forEach(o=>{const c=calcOrder(o);c.rows.forEach(r=>{const p=P(r.pid);
-    summary.push([o.date,o.shop,c.isCup?'杯數平均':'訂購人平均',p.tag,p.name,r.cups,r.sub,r.share,r.due,r.paid,r.remain]);
-    r.items.forEach(it=>items.push([o.date,o.shop,p.tag,p.name,it.item,+it.qty,+it.price,it.amt,it.note]))})});
+    summary.push([o.date,o.shop,o.platform||'',c.isCup?'杯數平均':'訂購人平均',p.tag,p.name,r.cups,r.sub,r.share,r.due,r.paid,r.remain]);
+    r.items.forEach(it=>items.push([o.date,o.shop,o.platform||'',p.tag,p.name,it.item,+it.qty,+it.price,it.amt,it.note]))})});
   const pays=[['訂單日期','小標','姓名','付款日期','付款方式','付款金額']];
   [...S.payments].sort((a,b)=>(a.payDate||'').localeCompare(b.payDate||'')).forEach(x=>{const o=O(x.oid),p=P(x.pid);pays.push([o?o.date:'(已刪)',p.tag,p.name,x.payDate,x.method,+x.amount])});
   const dep=[['儲值日期','小標','姓名','金額','方式','備註']];
@@ -600,8 +634,8 @@ $('#dXlsx').onclick=()=>{
   const ppl=[['小標','姓名','訂購次數','消費總額','目前欠款','零用金儲值','零用金已扣','零用金餘額']];
   [...S.people].sort((a,b)=>byPerson({pid:a.id},{pid:b.id})).forEach(p=>{const s=personSum(p.id);const n=S.orders.filter(o=>o.items.some(i=>i.pid===p.id)).length;ppl.push([p.tag,p.name,n,s.due,s.owe,s.dep,s.used,s.bal])});
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,sheet(summary,[12,12,11,10,10,6,10,10,10,10,10]),'帳務總表');
-  XLSX.utils.book_append_sheet(wb,sheet(items,[12,12,10,10,22,6,8,8,20]),'品項明細');
+  XLSX.utils.book_append_sheet(wb,sheet(summary,[12,12,12,11,10,10,6,10,10,10,10,10]),'帳務總表');
+  XLSX.utils.book_append_sheet(wb,sheet(items,[12,12,12,10,10,22,6,8,8,20]),'品項明細');
   XLSX.utils.book_append_sheet(wb,sheet(pays,[12,10,10,12,10,10]),'付款紀錄');
   XLSX.utils.book_append_sheet(wb,sheet(dep,[12,10,10,10,10,20]),'零用金');
   XLSX.utils.book_append_sheet(wb,sheet(ppl,[10,10,9,10,10,11,11,11]),'人員總覽');
@@ -624,7 +658,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 $('#fOrder').onchange=renderFront;$('#fSearch').oninput=renderFront;
 function renderAll(){renderFront();renderBack()}
 
-resetOrderForm();$('#pDate').value=today();$('#wDate').value=today();renderAll();
+resetOrderForm();$('#pDate').value=today();$('#wDate').value=today();$('#cDate').value=today();renderAll();
 </script>
 </body>
 </html>
